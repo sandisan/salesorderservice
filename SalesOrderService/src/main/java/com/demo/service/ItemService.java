@@ -23,7 +23,7 @@ public class ItemService {
 	@Autowired
 	private RestTemplate restTemplate;
 	
-	private final static String URL = "http://localhost:9093/item/all";
+	private final static String URL = "http://itemservice-cicd.169-61-227-230.nip.io/item/all";
 	
 	public Collection<Item> getItems(Collection<Long> ids) {
 		
