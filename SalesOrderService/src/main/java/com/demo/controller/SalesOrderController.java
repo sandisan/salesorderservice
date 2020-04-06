@@ -3,10 +3,13 @@ package com.demo.controller;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.jboss.logging.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,24 +47,37 @@ public class SalesOrderController {
 	private NextSequenceService nextSequenceService;
 
 	@PostMapping("/create")
-	public String createOrder(@RequestBody Order order) {
+	public ResponseEntity<String> createOrder(@RequestBody Order order) {
 		LOG.info("Creating order");
 		if (!customerService.isCustomerValid(order.getCustId())) {
-			return "Customer doesn't exist";
+			new ResponseEntity<String>("", HttpStatus.CREATED);
+			return new ResponseEntity<String>("Customer doesn't exist", HttpStatus.BAD_REQUEST);
 		}
 		if (null == order.getItems() || order.getItems().isEmpty()) {
-			return "No items selected";
+			return new ResponseEntity<String>("No items selected", HttpStatus.BAD_REQUEST);
 		}
+		int itemsInReq = order.getItems().size();
 		Collection<Item> items = itemService
 				.getItems(order.getItems().stream().map(Item::getId).collect(Collectors.toSet()));
 		if (null == items || items.isEmpty()) {
-			return "No valid items selected";
+			return new ResponseEntity<String>("No valid items selected", HttpStatus.BAD_REQUEST);
+		}
+		int validItems = items.size();
+		Collection<Long> validItemsIds = items.stream().map(Item::getId).collect(Collectors.toSet());
+		if (itemsInReq != validItems) {
+
+			return new ResponseEntity<String>(
+					"Items with the following IDs are not valid : "
+							+ order.getItems().stream().filter(e -> !validItemsIds.contains(e.getId()))
+									.map(f -> String.valueOf(f.getId())).collect(Collectors.joining(" , ")),
+					HttpStatus.BAD_REQUEST);
 		}
 		order.setTotalPrice(items.stream().map(e -> Double.valueOf(e.getItemPrice()))
 				.collect(Collectors.summingDouble(Double::floatValue)).floatValue());
 		order.setItems(items);
 		order.setOrderId(nextSequenceService.getNextSequence("customSequences"));
-		return "Order created successfully : ID : " + orderRepository.save(order).getOrderId();
+		return new ResponseEntity<String>(
+				"Order created successfully : ID : " + orderRepository.save(order).getOrderId(), HttpStatus.CREATED);
 	}
 
 	@GetMapping("/all")
